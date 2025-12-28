@@ -1,0 +1,336 @@
+<p align="center">
+  <img src="docs/assets/logo.png" alt="Sonic Oscillator Logo" width="200"/>
+</p>
+
+<h1 align="center">🎛️ The Sonic Oscillator</h1>
+
+<p align="center">
+  <strong>A bare-metal digital synthesizer built from scratch on ESP32-C3</strong>
+</p>
+
+<p align="center">
+  <a href="#features">Features</a> •
+  <a href="#demo">Demo</a> •
+  <a href="#hardware">Hardware</a> •
+  <a href="#installation">Installation</a> •
+  <a href="#architecture">Architecture</a> •
+  <a href="#roadmap">Roadmap</a>
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Platform-ESP32--C3-blue?style=flat-square&logo=espressif" alt="Platform"/>
+  <img src="https://img.shields.io/badge/Framework-Arduino-00979D?style=flat-square&logo=arduino" alt="Framework"/>
+  <img src="https://img.shields.io/badge/Version-3.1-green?style=flat-square" alt="Version"/>
+  <img src="https://img.shields.io/badge/License-MIT-yellow?style=flat-square" alt="License"/>
+  <img src="https://img.shields.io/badge/Status-Production-brightgreen?style=flat-square" alt="Status"/>
+</p>
+
+---
+
+## 📖 Overview
+
+The Sonic Oscillator is an embedded digital synthesizer that demonstrates real-time audio synthesis, DSP filtering, and professional UI design on a resource-constrained microcontroller. Built entirely from scratch using a bottom-up methodology, this project serves as both a functional musical instrument and a learning platform for embedded systems development.
+
+**Why this project?**
+
+This isn't just another Arduino buzzer sketch. It's a complete exploration of what happens when you push a $4 microcontroller to generate real-time audio — including the electrical engineering challenges (GPIO current limits, inductive loads, signal integrity) that tutorials never mention.
+
+---
+
+## ✨ Features
+
+### Audio Engine
+- **Multi-Waveform Synthesis** — Square, Saw, Triangle, and Chaotic Noise modes
+- **Real-Time DSP** — Software low-pass filter eliminates input jitter for smooth, "buttery" frequency control
+- **Protected Frequency Range** — Automatic clamping prevents LEDC peripheral instability below 350Hz
+
+### User Interface
+- **OLED Display** — 128x32 pixel screen with procedurally-drawn graphics (zero bitmap storage)
+- **Rotary Encoder Navigation** — Interrupt-driven input ensures no missed steps
+- **Smart Button** — Time-domain multiplexing distinguishes short press (select) from long press (mute)
+- **Safe Boot** — System always starts muted to prevent audio surprises
+
+### System Design
+- **State Machine Architecture** — Clean separation between Menu, Playing, and Mute states
+- **30 FPS Display Cap** — Prevents I2C bus saturation while maintaining responsive feel
+- **Timeout Auto-Return** — Menu automatically returns to playing mode after 10 seconds of inactivity
+
+---
+
+## 🎬 Demo
+
+<p align="center">
+  <img src="docs/assets/demo.gif" alt="Sonic Oscillator Demo" width="600"/>
+</p>
+
+| Mute State | Menu Navigation | Playing Mode |
+|:----------:|:---------------:|:------------:|
+| ![Mute](docs/assets/screen_mute.jpg) | ![Menu](docs/assets/screen_menu.jpg) | ![Playing](docs/assets/screen_playing.jpg) |
+
+---
+
+## 🔧 Hardware
+
+### Bill of Materials
+
+| Component | Specification | Purpose |
+|-----------|---------------|---------|
+| ESP32-C3 | RISC-V, 160MHz | Main controller |
+| OLED Display | SSD1306, 128x32, I2C | User interface |
+| Rotary Encoder | KY-040 with push button | Navigation & selection |
+| Potentiometer (x2) | 10kΩ linear | Pitch & tone control |
+| Piezo Buzzer | HW-508 module | Audio output |
+| NPN Transistor | 2N2222 / BC547 | Load switching |
+| Flyback Diode | 1N4148 / 1N5819 | Inductive protection |
+| Resistors | 1kΩ (base), 150Ω (protection) | Current limiting |
+
+### Schematic
+
+```
+                                    +3.3V
+                                      │
+        ┌─────────────────────────────┤
+        │                             │
+   ┌────┴────┐                   ┌────┴────┐
+   │  OLED   │                   │  Buzzer │
+   │ SSD1306 │                   │  HW-508 │
+   └────┬────┘                   └────┬────┘
+        │ I2C                         │
+   SDA──┤ (GPIO 18)                   │
+   SCL──┤ (GPIO 19)              ┌────┴────┐
+        │                        │ Flyback │
+   ┌────┴────┐                   │  Diode  │
+   │         │                   └────┬────┘
+   │ ESP32-C3│                        │
+   │         │                        │ Collector
+   │  GPIO 4 ├────[1kΩ]────┬────────┤
+   │         │             │    ┌───┴───┐
+   │  GPIO 0 ├─────────────┼────│ 2N2222│
+   │  GPIO 1 ├─────────────┼────│  NPN  │
+   │         │             │    └───┬───┘
+   │  GPIO 5 ├──┐          │        │ Emitter
+   │  GPIO 6 ├──┼─ Encoder │        │
+   │  GPIO 7 ├──┘          │       GND
+   └─────────┘             │
+                      Potentiometers
+                       (Pitch/Tone)
+```
+
+### Pin Configuration
+
+```cpp
+// Display (I2C)
+#define I2C_SDA         18
+#define I2C_SCL         19
+
+// Controls
+const int SW_PIN        = 7;    // Encoder button
+const int PIN_DT        = 5;    // Encoder data
+const int PIN_CLK       = 6;    // Encoder clock
+const int POT_PIN_PITCH = 0;    // Frequency control
+const int POT_PIN_TONE  = 1;    // Duty cycle control
+
+// Output
+const int BUZZER_PIN    = 4;    // PWM output
+```
+
+---
+
+## 🚀 Installation
+
+### Prerequisites
+
+- [PlatformIO](https://platformio.org/) or Arduino IDE
+- ESP32 board support package
+- USB-C cable for programming
+
+### Quick Start
+
+```bash
+# Clone the repository
+git clone https://github.com/yourusername/sonic-oscillator.git
+cd sonic-oscillator
+
+# Using PlatformIO (recommended)
+pio run -t upload
+
+# Or using Arduino IDE
+# 1. Open src/main.cpp
+# 2. Select "ESP32C3 Dev Module" as board
+# 3. Click Upload
+```
+
+### Dependencies
+
+```ini
+# platformio.ini
+[env:esp32-c3]
+platform = espressif32
+board = esp32-c3-devkitm-1
+framework = arduino
+lib_deps = 
+    adafruit/Adafruit GFX Library@^1.11.5
+    adafruit/Adafruit SSD1306@^2.5.7
+```
+
+---
+
+## 🏗️ Architecture
+
+### Software Structure
+
+```
+┌──────────────────────────────────────────────────────┐
+│                     Main Loop                        │
+├──────────────┬──────────────┬───────────────────────┤
+│    Input     │    State     │        Output         │
+│  Processing  │   Machine    │      Generation       │
+├──────────────┼──────────────┼───────────────────────┤
+│ • Button     │ • UI State   │ • Audio Engine        │
+│ • Encoder    │ • Mute State │ • Display Renderer    │
+│ • ADC + LPF  │ • Timeout    │ • LEDC PWM            │
+└──────────────┴──────────────┴───────────────────────┘
+```
+
+### State Machines
+
+**UI States:**
+```
+           ┌─────────────────────────────┐
+           │         Encoder             │
+           │         Movement            │
+           ▼                             │
+    ┌─────────────┐              ┌───────┴─────┐
+    │    MENU     │──── Select ──▶  PLAYING   │
+    │             │◀── Timeout ──│             │
+    └─────────────┘              └─────────────┘
+```
+
+**Mute States:**
+```
+    ┌─────────────┐  Long Press  ┌─────────────┐
+    │   ACTIVE    │◀────────────▶│    MUTED    │
+    └─────────────┘              └─────────────┘
+```
+
+### Key Algorithms
+
+**Input Smoothing (Exponential Moving Average):**
+```cpp
+smoothedValue = α × newValue + (1 - α) × smoothedValue
+// α = 0.1 provides strong smoothing with acceptable latency
+```
+
+**Encoder Debounce (ISR-based):**
+```cpp
+void IRAM_ATTR updateEncoder() {
+    if (millis() - lastInterruptTime > 10) {  // 10ms lockout
+        virtualPosition += (digitalRead(CLK) != digitalRead(DT)) ? 1 : -1;
+        lastInterruptTime = millis();
+    }
+}
+```
+
+---
+
+## 📊 Technical Challenges Solved
+
+### 1. GPIO Current Collapse
+**Problem:** Direct buzzer connection caused voltage drop from 3.3V to 1.5V  
+**Cause:** Buzzer demanded 220mA; GPIO can only supply 40mA  
+**Solution:** NPN transistor driver isolates load from GPIO
+
+### 2. Phantom Duty Cycle
+**Problem:** Oscilloscope showed 12% duty cycle instead of commanded 50%  
+**Cause:** `ledcWriteTone()` and `ledcWrite()` conflict  
+**Solution:** Use `ledcChangeFrequency()` + `ledcWrite()` pair
+
+### 3. Inductive Kickback
+**Problem:** -400mV spikes exceeded GPIO absolute maximum rating  
+**Cause:** Inductor back-EMF during switching  
+**Solution:** Flyback diode clamps negative excursions
+
+---
+
+## 🗺️ Roadmap
+
+### ✅ Phase 1: Core Synthesizer (Complete)
+- [x] Hardware PWM audio generation
+- [x] OLED display with procedural graphics
+- [x] Rotary encoder navigation
+- [x] Multi-waveform modes
+- [x] DSP input filtering
+- [x] State machine architecture
+
+### 🔄 Phase 2: Code Refactoring (In Progress)
+- [ ] Modular class-based architecture
+- [ ] Separate AudioEngine, InputManager, DisplayManager
+- [ ] Elimination of global variables
+- [ ] Non-blocking timing throughout
+
+### 📋 Phase 3: Teensy 4.1 Migration (Planned)
+- [ ] Port to ARM Cortex-M7 @ 600MHz
+- [ ] True DAC output for authentic waveforms
+- [ ] Teensy Audio Library integration
+- [ ] ADSR envelope generator
+
+### 🔮 Phase 4: Advanced Features (Future)
+- [ ] LFO for automatic modulation
+- [ ] Step sequencer for pattern playback
+- [ ] Resonant filter with cutoff control
+- [ ] FFT spectrum visualization
+
+---
+
+## 📁 Project Structure
+
+```
+sonic-oscillator/
+├── src/
+│   └── main.cpp              # Main application code
+├── include/
+│   └── config.h              # Pin definitions & constants
+├── docs/
+│   ├── assets/               # Images and media
+│   ├── EXECUTIVE_SUMMARY.md  # Detailed technical documentation
+│   └── SCHEMATIC.pdf         # Circuit diagram
+├── hardware/
+│   └── BOM.csv               # Bill of materials
+├── platformio.ini            # Build configuration
+├── LICENSE
+└── README.md
+```
+
+---
+
+## 🤝 Contributing
+
+This is primarily a personal learning project, but suggestions and discussions are welcome! Feel free to:
+
+- Open an issue for bugs or suggestions
+- Submit a PR for improvements
+- Fork and adapt for your own projects
+
+---
+
+## 📄 License
+
+This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
+
+---
+
+## 🙏 Acknowledgments
+
+- **Adafruit** — For excellent GFX and SSD1306 libraries
+- **Espressif** — For the ESP32-C3 platform and documentation
+- **PJRC** — For Teensy inspiration and Audio Library (upcoming)
+
+---
+
+<p align="center">
+  <strong>Built with ❤️ and an oscilloscope</strong>
+</p>
+
+<p align="center">
+  <sub>Part of the journey toward autonomous systems engineering</sub>
+</p>
